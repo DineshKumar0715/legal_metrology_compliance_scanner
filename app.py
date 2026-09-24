@@ -1,396 +1,474 @@
 import io
 import os
+import json
+from datetime import datetime
 import requests
 import streamlit as st
 from PIL import Image
+from dotenv import load_dotenv
 
-# Set Streamlit page configuration
+# Load environment
+load_dotenv()
+
 st.set_page_config(
-    page_title="Legal Metrology Compliance Scanner",
+    page_title="VERITAS | Legal Metrology Compliance Engine",
     page_icon="⚖️",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
-# Custom Styling for modern premium aesthetic
+API_ENDPOINT = os.getenv("API_ENDPOINT", "http://localhost:8000/scan-label")
+
+# Enterprise SaaS Design System & Styling
 st.markdown(
     """
     <style>
-    /* Main container styling */
-    .main-header {
-        font-size: 2.3rem;
-        font-weight: 800;
-        background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 50%, #06B6D4 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin-bottom: 0.2rem;
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+    html, body, [class*="css"] {
+        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
     }
-    .sub-header {
-        font-size: 1.05rem;
-        color: #64748B;
-        margin-bottom: 1.5rem;
-        font-weight: 400;
+
+    /* Hide Streamlit Deploy button, Header decorations, and Toolbar */
+    .stAppDeployButton,
+    [data-testid="stAppDeployButton"],
+    .stDeployButton,
+    header[data-testid="stHeader"] .stAppDeployButton,
+    div[data-testid="stToolbar"],
+    #MainMenu {
+        display: none !important;
+        visibility: hidden !important;
     }
-    /* Metric Cards */
-    .metric-card {
-        background: #FFFFFF;
+
+    /* Top enterprise header */
+    .brand-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1.25rem 1.75rem;
+        background: linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 41, 59, 0.8) 100%);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 16px;
+        margin-bottom: 1.75rem;
+        backdrop-filter: blur(16px);
+        box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+    }
+    .brand-title-wrap {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+    }
+    .brand-logo {
+        width: 44px;
+        height: 44px;
+        background: linear-gradient(135deg, #3b82f6, #6366f1);
         border-radius: 12px;
-        padding: 1.2rem;
-        border: 1px solid #E2E8F0;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
+    }
+    .brand-title {
+        font-size: 1.4rem;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        color: #ffffff;
+        margin: 0;
+        line-height: 1.2;
+    }
+    .brand-subtitle {
+        font-size: 0.82rem;
+        color: #94a3b8;
+        font-weight: 500;
+        margin: 0;
+    }
+    .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: rgba(16, 185, 129, 0.1);
+        border: 1px solid rgba(16, 185, 129, 0.3);
+        color: #34d399;
+        padding: 6px 14px;
+        border-radius: 9999px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+    .status-dot {
+        width: 8px;
+        height: 8px;
+        background-color: #10b981;
+        border-radius: 50%;
+        box-shadow: 0 0 10px #10b981;
+    }
+
+    /* Enterprise card containers */
+    .enterprise-card {
+        background: rgba(15, 23, 42, 0.65);
+        border: 1px solid rgba(255, 255, 255, 0.07);
+        border-radius: 14px;
+        padding: 1.5rem;
+        backdrop-filter: blur(12px);
+        margin-bottom: 1.25rem;
+    }
+
+    /* Metric Summary Panel */
+    .metric-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    .metric-box {
+        background: linear-gradient(180deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.8) 100%);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
+        padding: 1.25rem;
         text-align: center;
-    }
-    .metric-val-pass {
-        font-size: 2rem;
-        font-weight: 800;
-        color: #10B981;
-    }
-    .metric-val-fail {
-        font-size: 2rem;
-        font-weight: 800;
-        color: #EF4444;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
     }
     .metric-label {
-        font-size: 0.85rem;
+        font-size: 0.78rem;
+        font-weight: 600;
         text-transform: uppercase;
-        letter-spacing: 0.05em;
-        color: #64748B;
-        margin-top: 0.3rem;
+        letter-spacing: 0.06em;
+        color: #94a3b8;
+        margin-bottom: 6px;
     }
-    /* Status Badges */
-    .badge-pass {
-        display: inline-block;
-        background-color: #ECFDF5;
-        color: #065F46;
-        padding: 0.25rem 0.75rem;
-        border-radius: 9999px;
-        font-size: 0.85rem;
-        font-weight: 600;
-        border: 1px solid #A7F3D0;
+    .metric-value-large {
+        font-size: 1.9rem;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        line-height: 1.1;
     }
-    .badge-warn {
-        display: inline-block;
-        background-color: #FFFBEB;
-        color: #92400E;
-        padding: 0.25rem 0.75rem;
-        border-radius: 9999px;
-        font-size: 0.85rem;
-        font-weight: 600;
-        border: 1px solid #FDE68A;
+
+    /* Statutory Matrix Items */
+    .rule-card {
+        background: rgba(30, 41, 59, 0.45);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 12px;
+        padding: 1rem 1.25rem;
+        margin-bottom: 0.85rem;
+        transition: all 0.2s ease;
     }
-    .badge-fail {
-        display: inline-block;
-        background-color: #FEF2F2;
-        color: #991B1B;
-        padding: 0.25rem 0.75rem;
-        border-radius: 9999px;
-        font-size: 0.85rem;
-        font-weight: 600;
-        border: 1px solid #FECACA;
+    .rule-card:hover {
+        border-color: rgba(99, 102, 241, 0.3);
+        background: rgba(30, 41, 59, 0.65);
+    }
+    .rule-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 8px;
     }
     .rule-title {
+        font-size: 0.95rem;
         font-weight: 700;
-        font-size: 1.05rem;
-        color: #1E293B;
+        color: #f1f5f9;
     }
-    .rule-statute {
-        font-size: 0.8rem;
-        color: #64748B;
-        font-style: italic;
+    .badge-compliant {
+        background: rgba(16, 185, 129, 0.15);
+        color: #34d399;
+        border: 1px solid rgba(16, 185, 129, 0.3);
+        padding: 3px 10px;
+        border-radius: 6px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+    }
+    .badge-violation {
+        background: rgba(245, 158, 11, 0.15);
+        color: #fbbf24;
+        border: 1px solid rgba(245, 158, 11, 0.35);
+        padding: 3px 10px;
+        border-radius: 6px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+    }
+    .badge-missing {
+        background: rgba(239, 68, 68, 0.15);
+        color: #f87171;
+        border: 1px solid rgba(239, 68, 68, 0.35);
+        padding: 3px 10px;
+        border-radius: 6px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+    }
+    .value-pill {
+        background: rgba(15, 23, 42, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 6px;
+        padding: 6px 10px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.82rem;
+        color: #e2e8f0;
+        margin: 6px 0;
+        word-break: break-word;
+    }
+    .remarks-text {
+        font-size: 0.82rem;
+        color: #94a3b8;
+        line-height: 1.4;
+    }
+
+    /* Clean Streamlit elements override */
+    button[kind="primary"] {
+        background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%) !important;
+        border: none !important;
+        font-weight: 600 !important;
+        padding: 0.65rem 1.5rem !important;
+        border-radius: 10px !important;
+        box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3) !important;
+        transition: transform 0.1s ease, box-shadow 0.1s ease !important;
+    }
+    button[kind="primary"]:hover {
+        transform: translateY(-1px) !important;
+        box-shadow: 0 6px 20px rgba(37, 99, 235, 0.45) !important;
     }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
-# API Endpoint URL
-API_URL = os.getenv("API_URL", "http://localhost:8000/scan-label")
-
-# Sidebar
-with st.sidebar:
-    st.image("https://img.icons8.com/fluency/96/scales.png", width=64)
-    st.title("Audit Configuration")
-    st.markdown(
-        """
-        **Statutory Framework:**
-        - Legal Metrology Act, 2009
-        - Packaged Commodities Rules, 2011 (PCR)
-        - Rule 6 Mandatory Declarations
-        """
-    )
-    st.divider()
-    st.markdown("### 🔌 API Backend")
-    api_endpoint = st.text_input("FastAPI Endpoint", value=API_URL)
-    
-    # Check API status
-    try:
-        health_resp = requests.get(api_endpoint.replace("/scan-label", "/"), timeout=2)
-        if health_resp.status_code == 200:
-            st.success("🟢 API Server Connected")
-        else:
-            st.warning("🟠 API Server Error")
-    except Exception:
-        st.error("🔴 API Server Offline (Check localhost:8000)")
-    
-    st.divider()
-    st.info(
-        "💡 **Tip:** Upload clear, front-facing images of product packaging or mandatory declaration panels."
-    )
-
-# Header Section
-st.markdown('<div class="main-header">⚖️ Legal Metrology Compliance Scanner</div>', unsafe_allow_html=True)
+# Enterprise Navigation & System Header
 st.markdown(
-    '<div class="sub-header">Automated statutory label audit for Packaged Commodities under Legal Metrology Rules, 2011</div>',
+    """
+    <div class="brand-header">
+        <div class="brand-title-wrap">
+            <div class="brand-logo">⚖️</div>
+            <div>
+                <h1 class="brand-title">VERITAS METROLOGY AI</h1>
+                <p class="brand-subtitle">Automated Compliance Verification System &bull; Legal Metrology (Packaged Commodities) Rules, 2011</p>
+            </div>
+        </div>
+        <div class="status-pill">
+            <div class="status-dot"></div>
+            <span>Multimodal Core Active</span>
+        </div>
+    </div>
+    """,
     unsafe_allow_html=True,
 )
 
-# Layout: Left Column (Input & Preview), Right Column (Audit Results)
-col_left, col_right = st.columns([1, 1.2], gap="large")
+# Main Application Layout
+col_upload, col_audit = st.columns([1, 1], gap="large")
 
-with col_left:
-    st.subheader("📷 Label Image Input")
+with col_upload:
+    st.markdown("### 📥 Product Ingestion")
     
-    input_mode = st.radio(
-        "Select Input Method:",
-        ["Upload Image File", "Use Camera Scan", "Load Sample Test Label"],
-        horizontal=True,
-    )
-
-    image_bytes = None
-    preview_image = None
-
-    if input_mode == "Upload Image File":
-        uploaded_file = st.file_uploader(
-            "Choose a label image (PNG, JPG, JPEG, WEBP):",
-            type=["png", "jpg", "jpeg", "webp"],
-            help="Upload a clear photograph or digital scan of the commodity label.",
+    input_tab1, input_tab2 = st.tabs(["📁 File Upload", "📷 Live Camera Inspection"])
+    
+    uploaded_file = None
+    with input_tab1:
+        file_input = st.file_uploader(
+            "Select high-resolution packaging label (JPG, PNG, WEBP)",
+            type=["jpg", "jpeg", "png", "webp"],
+            help="High-contrast, glare-free product label images deliver optimal compliance scoring.",
+            label_visibility="collapsed",
         )
-        if uploaded_file is not None:
-            image_bytes = uploaded_file.getvalue()
-            preview_image = Image.open(io.BytesIO(image_bytes))
+        if file_input:
+            uploaded_file = file_input
 
-    elif input_mode == "Use Camera Scan":
-        camera_file = st.camera_input("Take a photo of the package label")
-        if camera_file is not None:
-            image_bytes = camera_file.getvalue()
-            preview_image = Image.open(io.BytesIO(image_bytes))
+    with input_tab2:
+        camera_input = st.camera_input("Capture live packaging label via inspection webcam")
+        if camera_input:
+            uploaded_file = camera_input
 
-    elif input_mode == "Load Sample Test Label":
-        sample_choice = st.selectbox(
-            "Select a pre-configured sample label:",
-            [
-                "Sample 1: Fully Compliant Biscuit Label (100% Score)",
-                "Sample 2: Non-Compliant Net Qty ('500 gm') & Missing Tax Text",
-                "Sample 3: Missing Country of Origin & Consumer Care Helpline",
-            ],
-        )
-        # Generate on-the-fly sample image using Pillow
-        from PIL import ImageDraw, ImageFont
-        sample_img = Image.new("RGB", (700, 480), color=(252, 252, 253))
-        draw = ImageDraw.Draw(sample_img)
-        
-        # Border
-        draw.rectangle([(10, 10), (690, 470)], outline=(180, 190, 205), width=3)
-        draw.rectangle([(20, 20), (680, 70)], fill=(30, 58, 138))
-        draw.text((35, 30), "PREMIUM PACKAGED COMMODITY LABEL", fill=(255, 255, 255))
-        
-        if "Sample 1" in sample_choice:
-            sample_lines = [
-                ("COMMODITY:", "Nutri Delight Whole Wheat Biscuits"),
-                ("NET QUANTITY:", "500 g"),
-                ("MRP:", "Rs. 95.00 (inclusive of all taxes)"),
-                ("MFD & PKD BY:", "Golden Bake Foods Pvt Ltd, Industrial Area, Sector 4, Pune 411018"),
-                ("DATE OF MFG:", "05/2024"),
-                ("CONSUMER CARE:", "Customer Care Helpline: 1800-222-3333 | Email: care@goldenbake.com"),
-                ("COUNTRY OF ORIGIN:", "India"),
-            ]
-        elif "Sample 2" in sample_choice:
-            sample_lines = [
-                ("COMMODITY:", "Super Crunch Cookies"),
-                ("NET QUANTITY:", "500 gm"),  # VIOLATION: gm instead of g
-                ("MRP:", "Rs. 100"),        # VIOLATION: Missing 'incl. of all taxes'
-                ("MFD & PKD BY:", "Apex Confectionery Works, Mumbai 400001"),
-                ("DATE OF MFG:", "04/2024"),
-                ("CONSUMER CARE:", "Consumer Cell: 1800-111-2222 | Email: support@apex.in"),
-                ("COUNTRY OF ORIGIN:", "India"),
-            ]
-        else:
-            sample_lines = [
-                ("COMMODITY:", "Smart Wireless Earbuds"),
-                ("NET QUANTITY:", "1 N"),
-                ("MRP:", "Rs. 1499.00 (incl. of all taxes)"),
-                ("IMPORTED BY:", "Global Tech Imports Ltd, Bengaluru 560001"),
-                ("DATE OF IMPORT:", "03/2024"),
-                ("CONSUMER CARE:", "For feedback contact: Customer Care"), # VIOLATION: Missing phone/email
-                # VIOLATION: Missing Country of origin
-            ]
-        
-        y_pos = 90
-        for label, val in sample_lines:
-            draw.text((35, y_pos), label, fill=(15, 23, 42))
-            draw.text((220, y_pos), val, fill=(30, 41, 59))
-            y_pos += 48
-            draw.line([(35, y_pos - 8), (665, y_pos - 8)], fill=(226, 232, 240), width=1)
+    if uploaded_file is not None:
+        try:
+            image = Image.open(io.BytesIO(uploaded_file.getvalue()))
+            st.image(image, caption="Current Ingestion Preview", use_container_width=True)
             
-        buf = io.BytesIO()
-        sample_img.save(buf, format="PNG")
-        image_bytes = buf.getvalue()
-        preview_image = sample_img
-
-    # Image Preview
-    if preview_image is not None:
-        st.image(preview_image, caption="Label Preview", use_container_width=True)
-        audit_button = st.button("🔍 Run Compliance Audit", type="primary", use_container_width=True)
+            scan_action = st.button(
+                "⚡ Run Statutory Compliance Audit",
+                type="primary",
+                use_container_width=True,
+            )
+        except Exception as e:
+            st.error(f"Could not load image: {e}")
+            scan_action = False
     else:
-        st.info("👆 Please upload an image or select a sample to begin.")
-        audit_button = False
+        scan_action = False
+        st.markdown(
+            """
+            <div class="enterprise-card" style="text-align: center; color: #64748b; padding: 3rem 1.5rem;">
+                <div style="font-size: 2.5rem; margin-bottom: 0.75rem;">📦</div>
+                <div style="font-weight: 600; color: #cbd5e1; margin-bottom: 0.25rem;">Awaiting Product Label</div>
+                <div style="font-size: 0.85rem;">Upload or capture an image above to trigger automated legal metrology audit.</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
-with col_right:
-    st.subheader("📊 Statutory Compliance Audit Results")
+with col_audit:
+    st.markdown("### 📊 Executive Compliance Report")
 
-    if audit_button and image_bytes:
-        with st.spinner("⏳ Analyzing label via Computer Vision OCR & Legal Metrology Rule Engine..."):
+    if scan_action and uploaded_file is not None:
+        with st.spinner("Executing multimodal perception & statutory rule evaluation..."):
             try:
-                files = {"file": ("label.png", image_bytes, "image/png")}
-                response = requests.post(api_endpoint, files=files, timeout=60)
+                file_bytes = uploaded_file.getvalue()
+                file_name = uploaded_file.name or "label_scan.jpg"
+                content_type = uploaded_file.type or "image/jpeg"
+                files = {"file": (file_name, file_bytes, content_type)}
+                
+                response = requests.post(API_ENDPOINT, files=files, timeout=75)
 
                 if response.status_code == 200:
                     data = response.json()
-                    st.session_state["compliance_result"] = data
+                    status = data.get("status", "NON_COMPLIANT")
+                    score = float(data.get("overall_compliance_score", 0.0))
+                    violations = int(data.get("violations_count", 0))
+                    declarations = data.get("declarations", {})
+                    raw_text = data.get("raw_text", "")
+
+                    # Color coding logic
+                    is_compliant = (status == "COMPLIANT")
+                    status_color = "#10b981" if is_compliant else "#ef4444"
+                    status_bg = "rgba(16, 185, 129, 0.12)" if is_compliant else "rgba(239, 68, 68, 0.12)"
+                    status_border = "rgba(16, 185, 129, 0.3)" if is_compliant else "rgba(239, 68, 68, 0.3)"
+
+                    # Top KPI Metric Grid
+                    st.markdown(
+                        f"""
+                        <div class="metric-grid">
+                            <div class="metric-box" style="border-color: {status_border}; background: {status_bg};">
+                                <div class="metric-label">Audit Verdict</div>
+                                <div class="metric-value-large" style="color: {status_color}; font-size: 1.45rem;">
+                                    {"✅ COMPLIANT" if is_compliant else "❌ NON-COMPLIANT"}
+                                </div>
+                            </div>
+                            <div class="metric-box">
+                                <div class="metric-label">Compliance Score</div>
+                                <div class="metric-value-large" style="color: {'#34d399' if score >= 80 else '#fbbf24' if score >= 50 else '#f87171'};">
+                                    {score:.1f}%
+                                </div>
+                            </div>
+                            <div class="metric-box">
+                                <div class="metric-label">Violations Flagged</div>
+                                <div class="metric-value-large" style="color: {'#34d399' if violations == 0 else '#f87171'};">
+                                    {violations}
+                                </div>
+                            </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+
+                    st.markdown("#### 📜 Statutory Declaration Matrix")
+
+                    field_order = [
+                        ("mrp", "1. Maximum Retail Price (MRP)"),
+                        ("net_quantity", "2. Net Quantity & Standard Units"),
+                        ("date_of_packing", "3. Date of Packing / Manufacture"),
+                        ("consumer_care", "4. Consumer Care & Grievance Redressal"),
+                        ("manufacturer_details", "5. Manufacturer / Packer Identity"),
+                        ("country_of_origin", "6. Country of Origin"),
+                    ]
+
+                    for field_key, field_title in field_order:
+                        field_data = declarations.get(field_key, {})
+                        detected = field_data.get("detected", False)
+                        compliant = field_data.get("compliant", False)
+                        val = field_data.get("value")
+                        remarks = field_data.get("remarks", "No additional remarks.")
+
+                        if compliant:
+                            badge_html = '<span class="badge-compliant">✓ COMPLIANT</span>'
+                            border_style = "border-left: 4px solid #10b981;"
+                        elif detected:
+                            badge_html = '<span class="badge-violation">⚠ FORMAT VIOLATION</span>'
+                            border_style = "border-left: 4px solid #f59e0b;"
+                        else:
+                            badge_html = '<span class="badge-missing">✕ MISSING</span>'
+                            border_style = "border-left: 4px solid #ef4444;"
+
+                        display_val = val if (detected and val) else "Declaration absent / Not found"
+
+                        st.markdown(
+                            f"""
+                            <div class="rule-card" style="{border_style}">
+                                <div class="rule-header">
+                                    <span class="rule-title">{field_title}</span>
+                                    {badge_html}
+                                </div>
+                                <div class="value-pill">{display_val}</div>
+                                <div class="remarks-text">{remarks}</div>
+                            </div>
+                            """,
+                            unsafe_allow_html=True,
+                        )
+
+                    # Export & Raw Data Section
+                    col_export1, col_export2 = st.columns([1, 1])
+                    with col_export1:
+                        report_json = json.dumps(data, indent=2)
+                        st.download_button(
+                            label="📥 Export Audit JSON",
+                            data=report_json,
+                            file_name=f"legal_metrology_audit_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                            mime="application/json",
+                            use_container_width=True,
+                        )
+                    
+                    with col_export2:
+                        summary_txt = f"""LEGAL METROLOGY COMPLIANCE AUDIT
+Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+Status: {status}
+Score: {score}%
+Violations: {violations}
+
+DECLARATIONS:
+"""
+                        for k, v in declarations.items():
+                            summary_txt += f"- {k.upper()}: {'COMPLIANT' if v.get('compliant') else 'FAILED'} | Value: {v.get('value')} | Remarks: {v.get('remarks')}\n"
+                        
+                        st.download_button(
+                            label="📄 Export Text Summary",
+                            data=summary_txt,
+                            file_name=f"compliance_summary_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+                            mime="text/plain",
+                            use_container_width=True,
+                        )
+
+                    with st.expander("🔍 Complete Optical Transcription (`raw_text`)"):
+                        st.text_area(
+                            "Verbatim Packaging Text Extracted by Multimodal Model",
+                            value=raw_text,
+                            height=180,
+                            disabled=True,
+                        )
+
+                elif response.status_code == 400:
+                    detail = response.json().get("detail", response.text)
+                    st.error(f"⚠️ Bad Request (400): {detail}")
+                elif response.status_code == 500:
+                    detail = response.json().get("detail", response.text)
+                    st.error(f"🚨 Audit Engine Error (500): {detail}")
                 else:
-                    st.error(f"❌ Backend Error ({response.status_code}): {response.text}")
+                    st.error(f"Unexpected Response ({response.status_code}): {response.text}")
+
             except requests.exceptions.ConnectionError:
                 st.error(
-                    f"🔌 Connection Refused! Could not reach FastAPI at `{api_endpoint}`. Ensure `python -m uvicorn main:app --port 8000` is running."
+                    "❌ **Backend Gateway Unreachable**\n\n"
+                    "The FastAPI service is not responding on `http://localhost:8000`. Please verify the backend is running."
                 )
-            except Exception as e:
-                st.error(f"❌ Error during scan: {str(e)}")
-
-    if "compliance_result" in st.session_state:
-        result = st.session_state["compliance_result"]
-        
-        status = result.get("status", "NON_COMPLIANT")
-        score = result.get("overall_compliance_score", 0.0)
-        violations = result.get("violations_count", 0)
-        declarations = result.get("declarations", {})
-        raw_text = result.get("raw_text", "")
-
-        # Summary Metric Cards
-        m_col1, m_col2, m_col3 = st.columns(3)
-        with m_col1:
-            status_html = (
-                f'<div class="metric-val-pass">COMPLIANT</div>'
-                if status == "COMPLIANT"
-                else f'<div class="metric-val-fail">NON-COMPLIANT</div>'
-            )
-            st.markdown(
-                f"""
-                <div class="metric-card">
-                    {status_html}
-                    <div class="metric-label">Overall Status</div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-        with m_col2:
-            score_color = "metric-val-pass" if score >= 80 else ("metric-val-fail" if score < 50 else "metric-val-pass")
-            st.markdown(
-                f"""
-                <div class="metric-card">
-                    <div class="{score_color}">{score:.1f}%</div>
-                    <div class="metric-label">Compliance Score</div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-        with m_col3:
-            v_color = "metric-val-pass" if violations == 0 else "metric-val-fail"
-            st.markdown(
-                f"""
-                <div class="metric-card">
-                    <div class="{v_color}">{violations}</div>
-                    <div class="metric-label">Violations / Missing</div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-
-        st.markdown("<br>", unsafe_allow_html=True)
-
-        # Rule-by-rule Accordion
-        rule_meta = {
-            "mrp": {
-                "title": "1. Maximum Retail Price (MRP)",
-                "statute": "Rule 6(1)(e) - Inclusive of all taxes mandate",
-                "icon": "💰",
-            },
-            "net_quantity": {
-                "title": "2. Net Quantity & Standard Units",
-                "statute": "Rule 6(1)(c) - Standard metric units (g, kg, ml, l, N)",
-                "icon": "⚖️",
-            },
-            "date_of_packing": {
-                "title": "3. Date of Packing / Manufacture",
-                "statute": "Rule 6(1)(d) - Month & Year of packing/mfg",
-                "icon": "📅",
-            },
-            "consumer_care": {
-                "title": "4. Consumer Care & Grievance Redressal",
-                "statute": "Rule 6(1)(n) - Contact name, helpline & email",
-                "icon": "📞",
-            },
-            "manufacturer_details": {
-                "title": "5. Manufacturer / Packer / Importer",
-                "statute": "Rule 6(1)(a) - Complete name and address",
-                "icon": "🏭",
-            },
-            "country_of_origin": {
-                "title": "6. Country of Origin",
-                "statute": "Rule 6(1)(m) - Origin declaration",
-                "icon": "🌐",
-            },
-        }
-
-        for rule_key, meta in rule_meta.items():
-            field_data = declarations.get(rule_key, {})
-            detected = field_data.get("detected", False)
-            compliant = field_data.get("compliant", False)
-            value = field_data.get("value")
-            remarks = field_data.get("remarks", "")
-
-            # Determine badge and expansion
-            if compliant:
-                badge = '<span class="badge-pass">✅ Compliant</span>'
-                expanded = False
-            elif detected and not compliant:
-                badge = '<span class="badge-warn">⚠️ Detected (Non-Compliant)</span>'
-                expanded = True
-            else:
-                badge = '<span class="badge-fail">❌ Missing Declaration</span>'
-                expanded = True
-
-            with st.expander(f"{meta['icon']} {meta['title']}", expanded=expanded):
-                st.markdown(f"**Statutory Reference:** `{meta['statute']}`")
-                st.markdown(f"**Compliance Status:** {badge}", unsafe_allow_html=True)
-                
-                if detected and value:
-                    st.markdown(f"**Extracted Text:** `{value}`")
-                else:
-                    st.markdown("**Extracted Text:** *None detected*")
-                
-                if compliant:
-                    st.success(remarks)
-                elif detected and not compliant:
-                    st.warning(remarks)
-                else:
-                    st.error(remarks)
-
-        # Raw OCR Text Section
-        with st.expander("📝 Raw OCR Extracted Text", expanded=False):
-            if raw_text:
-                st.text_area("Extracted OCR Content:", value=raw_text, height=180)
-            else:
-                st.write("No text extracted.")
-
-    elif not audit_button:
-        st.info("💡 Upload or capture an image on the left, then click **'Run Compliance Audit'** to view the statutory breakdown.")
+            except requests.exceptions.Timeout:
+                st.error("⏳ **Audit Timeout** — The multimodal vision engine took longer than expected to process.")
+            except Exception as err:
+                st.error(f"An unexpected system exception occurred: {err}")
+    else:
+        st.markdown(
+            """
+            <div class="enterprise-card" style="text-align: center; color: #64748b; padding: 4rem 1.5rem;">
+                <div style="font-size: 2.5rem; margin-bottom: 0.75rem;">📋</div>
+                <div style="font-weight: 600; color: #cbd5e1; margin-bottom: 0.25rem;">Audit Report Pending</div>
+                <div style="font-size: 0.85rem;">Click 'Run Statutory Compliance Audit' on the left to generate the complete regulatory matrix.</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )

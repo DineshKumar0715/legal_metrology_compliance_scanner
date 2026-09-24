@@ -1,36 +1,23 @@
-import sys
-from contextlib import asynccontextmanager
-from fastapi import FastAPI, File, UploadFile, HTTPException, status
+import io
+import os
+from PIL import Image
+from dotenv import load_dotenv
+from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from ocr_engine import OCREngine
-from compliance_engine import ComplianceEngine
+# Load .env file
+load_dotenv()
+
 from schemas import ComplianceResponse
-
-# Global engine instances
-ocr_engine: OCREngine = None
-compliance_engine: ComplianceEngine = None
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Lifespan context manager to initialize OCR and Compliance engines."""
-    global ocr_engine, compliance_engine
-    print("[INIT] Initializing EasyOCR Reader and Compliance Engine...", flush=True)
-    ocr_engine = OCREngine(gpu=False)
-    compliance_engine = ComplianceEngine()
-    print("[INIT] Legal Metrology Compliance Engines successfully loaded.", flush=True)
-    yield
-
+from gemini_compliance_engine import GeminiComplianceEngine
 
 app = FastAPI(
-    title="Legal Metrology Compliance API",
-    description="Statutory rule engine and OCR auditor for packaged commodity labels under Legal Metrology (Packaged Commodities) Rules, 2011.",
-    version="1.0.0",
-    lifespan=lifespan,
+    title="Legal Metrology Compliance API (Gemini Multimodal)",
+    description="Automated multimodal label verification under Legal Metrology (Packaged Commodities) Rules, 2011 powered by Google Gemini 2.5 Flash",
+    version="2.0.0",
 )
 
-# CORS Middleware allowing all origins
+# Enable CORS for frontend integrations (Streamlit, React, etc.)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -39,71 +26,58 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Initialize Gemini Compliance Engine
+compliance_engine = GeminiComplianceEngine()
 
-@app.get("/", tags=["Health"])
-async def root():
-    """Health check and service status endpoint."""
+
+@app.get("/")
+def read_root():
     return {
-        "status": "active",
-        "service": "Legal Metrology Compliance API",
-        "version": "1.0.0",
-        "engine_ready": ocr_engine is not None,
+        "status": "Active",
+        "message": "Legal Metrology Compliance API (Gemini Multimodal) is running.",
+        "model": "gemini-2.5-flash",
     }
 
 
-@app.post(
-    "/scan-label",
-    response_model=ComplianceResponse,
-    tags=["Compliance Audit"],
-    summary="Scan label image and perform Legal Metrology statutory compliance audit",
-)
-async def scan_label(file: UploadFile = File(...)):
-    """
-    Upload a packaged commodity label image.
-    Performs:
-    1. MIME type validation (JPEG, PNG, WEBP)
-    2. Computer vision preprocessing and EasyOCR text extraction
-    3. Rule 6 compliance evaluation across 6 statutory declarations
-    """
-    valid_mime_types = ["image/jpeg", "image/png", "image/jpg", "image/webp"]
-    if file.content_type and file.content_type.lower() not in valid_mime_types:
+@app.get("/health")
+def health_check():
+    load_dotenv(override=True)
+    key = os.getenv("GEMINI_API_KEY")
+    api_key_configured = bool(
+        key
+        and key.strip()
+        and key != "your_gemini_api_key_here"
+    )
+    return {
+        "status": "ok",
+        "engine": "gemini-2.5-flash",
+        "api_key_configured": api_key_configured,
+    }
+
+
+@app.post("/scan-label", response_model=ComplianceResponse)
+def scan_label(file: UploadFile = File(...)):
+    if file.content_type not in ["image/jpeg", "image/png", "image/jpg", "image/webp"]:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid file type '{file.content_type}'. Please upload an image (JPEG, PNG, WEBP).",
+            status_code=400,
+            detail="Invalid image format. Supported formats are JPG, JPEG, PNG, and WEBP.",
         )
 
     try:
-        image_bytes = await file.read()
-        if not image_bytes:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Uploaded file is empty.",
-            )
-
-        # Fallback initialization if lifespan hasn't fired
-        global ocr_engine, compliance_engine
-        if ocr_engine is None:
-            ocr_engine = OCREngine(gpu=False)
-        if compliance_engine is None:
-            compliance_engine = ComplianceEngine()
-
-        # Step 1: Run OCR extraction
-        raw_text, _ = ocr_engine.extract_text(image_bytes)
-
-        # Step 2: Run Compliance Evaluation
-        compliance_result = compliance_engine.evaluate_compliance(raw_text)
-
-        return compliance_result
-
-    except HTTPException:
-        raise
-    except Exception as e:
+        contents = file.file.read()
+        pil_image = Image.open(io.BytesIO(contents))
+        report = compliance_engine.evaluate_image(pil_image)
+        return report
+    except ValueError as val_err:
+        raise HTTPException(status_code=500, detail=str(val_err))
+    except Exception as exc:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error processing image for compliance audit: {str(e)}",
+            status_code=500,
+            detail=f"Label compliance evaluation failed: {str(exc)}",
         )
 
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

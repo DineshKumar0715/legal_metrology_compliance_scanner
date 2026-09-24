@@ -1,25 +1,26 @@
-# Virtual Environment
+# Environment variables and API keys (CRITICAL)
+.env
+*.env
+!.env.example
+
+# Virtual environments
+.venv/
 venv/
 env/
 ENV/
-.venv/
 
-# Python cache
+# Python bytecode and cache
 __pycache__/
 *.py[cod]
 *$py.class
-
-# Pytest / Testing
 .pytest_cache/
-.coverage
-htmlcov/
 
-# Operating System
-.DS_Store
-Thumbs.db
-*.tmp
-
-# IDE / Editor
+# IDE & OS files
 .vscode/
 .idea/
-*.swp
+.DS_Store
+Thumbs.db
+
+# Evaluation temporary dumps
+eval/images/
+eval/baseline_metrics.json

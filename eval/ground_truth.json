@@ -1,0 +1,39 @@
+[
+  {
+    "id": "label_001",
+    "image": "images/label_001.jpg",
+    "text": "Parle-G\nGLUCOSE BISCUITS\nPKD:      BATCH:      USE BY:\nNET WEIGHT: 80 g\nMRP Rs. 10.00 (incl. of all taxes)\nCONSUMER CARE DETAILS\nPHONE NO.: 1800 209 6929 (TOLL FREE)\nMANUFACTURED BY PARLE PRODUCTS PVT. LTD.",
+    "fields": {
+      "mrp": "Rs. 10.00 (incl. of all taxes)",
+      "net_quantity": "80 g",
+      "date_of_packing": null,
+      "consumer_care": "Phone: 1800 209 6929 (Toll Free)",
+      "manufacturer_details": "Manufactured by Parle Products Pvt. Ltd.",
+      "country_of_origin": null
+    },
+    "expected_compliance": {
+      "status": "non_compliant",
+      "missing_declarations": ["date_of_packing", "country_of_origin"]
+    },
+    "capture_conditions": ["flat", "good_light", "small_text", "low_resolution"]
+  }
+,
+  {
+    "id": "label_002",
+    "image": "images/label_002.jpg",
+    "text": "<type exactly what's printed on this second item>",
+    "fields": {
+      "mrp": "<value or null>",
+      "net_quantity": "<value or null>",
+      "date_of_packing": "<value or null>",
+      "consumer_care": "<value or null>",
+      "manufacturer_details": "<value or null>",
+      "country_of_origin": "<value or null>"
+    },
+    "expected_compliance": {
+      "status": "<compliant or non_compliant>",
+      "missing_declarations": ["<any that are null>"]
+    },
+    "capture_conditions": ["flat", "good_light", "large_text"]
+  }
+]

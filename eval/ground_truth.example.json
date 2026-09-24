@@ -1,0 +1,24 @@
+[
+  {
+    "id": "label_001",
+    "image": "images/label_001.jpg",
+    "text": "MRP Rs. 45 inclusive of all taxes\nNet Quantity 500 g\nMade in India",
+    "fields": {
+      "mrp": "45",
+      "net_quantity": "500 g",
+      "date_of_packing": null,
+      "consumer_care": null,
+      "manufacturer_details": null,
+      "country_of_origin": "India"
+    },
+    "expected_compliance": {
+      "status": "non_compliant",
+      "missing_declarations": [
+        "date_of_packing",
+        "consumer_care",
+        "manufacturer_details"
+      ]
+    },
+    "capture_conditions": ["flat", "good_light"]
+  }
+]
