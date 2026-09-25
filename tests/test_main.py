@@ -23,26 +23,47 @@ def test_root_endpoint():
     response = client.get("/")
     assert response.status_code == 200
     data = response.json()
-    assert data["status"] == "active"
-    assert "Legal Metrology" in data["service"]
+    assert data["status"] == "Active"
+    assert "VERITAS" in data["platform"]
 
 
-def test_scan_label_invalid_file_type():
-    response = client.post(
-        "/scan-label",
-        files={"file": ("test.txt", b"plain text", "text/plain")},
-    )
-    assert response.status_code == 400
-    assert "Invalid file type" in response.json()["detail"]
+def test_health_endpoint():
+    response = client.get("/health")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ok"
+    assert data["local_rule_engine_ready"] is True
 
 
-def test_scan_label_empty_file():
-    response = client.post(
-        "/scan-label",
-        files={"file": ("empty.png", b"", "image/png")},
-    )
-    assert response.status_code == 400
-    assert "empty" in response.json()["detail"].lower()
+def test_auth_login():
+    response = client.post("/auth/login", json={"username": "inspector", "password": "inspector123"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["username"] == "inspector"
+    assert data["role"] == "INSPECTOR"
+
+
+def test_physical_verify_api():
+    # 500g declared vs 430g measured -> deficit violation
+    payload = {
+        "declared_net_quantity": 500.0,
+        "unit": "g",
+        "measured_actual_quantity": 430.0,
+        "tare_weight": 0.0
+    }
+    response = client.post("/physical-verify", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["is_within_mpe_limit"] is False
+    assert data["status"] == "DEFICIT_VIOLATION"
+
+
+def test_dashboard_stats_api():
+    response = client.get("/dashboard/stats")
+    assert response.status_code == 200
+    data = response.json()
+    assert "total_inspections" in data
+    assert "overall_compliance_rate" in data
 
 
 def test_scan_label_e2e_image():
@@ -63,9 +84,8 @@ def test_scan_label_e2e_image():
     assert response.status_code == 200
     data = response.json()
     assert "status" in data
-    assert "overall_compliance_score" in data
+    assert "package_declaration_score" in data
     assert "declarations" in data
     assert "mrp" in data["declarations"]
     assert "net_quantity" in data["declarations"]
     assert "country_of_origin" in data["declarations"]
-

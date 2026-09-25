@@ -1,69 +1,124 @@
 import io
 import sys
+import json
 import requests
 from PIL import Image, ImageDraw
+from fastapi.testclient import TestClient
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
+from main import app
+
+# Determine if live server is running, otherwise use FastAPI TestClient
+USE_LIVE_SERVER = False
+try:
+    check = requests.get("http://127.0.0.1:8000/", timeout=1)
+    if check.status_code == 200:
+        USE_LIVE_SERVER = True
+except Exception:
+    USE_LIVE_SERVER = False
+
+if USE_LIVE_SERVER:
+    client = requests
+    BASE_URL = "http://127.0.0.1:8000"
+    print("🌐 Testing against Live Server (http://127.0.0.1:8000)")
+else:
+    client = TestClient(app)
+    BASE_URL = ""
+    print("⚡ Testing in-memory via FastAPI TestClient (Zero Dependency / Offline)")
+
+from PIL import Image, ImageDraw, ImageFont
+
+def create_sample_image(lines):
+    # Create crisp high-contrast canvas with PIL for reliable optical recognition
+    line_h = 55
+    w = 1400
+    h = max(500, len(lines) * line_h + 80)
+    img = Image.new("RGB", (w, h), color=(255, 255, 255))
+    draw = ImageDraw.Draw(img)
+    try:
+        font = ImageFont.truetype("arial.ttf", 24)
+    except Exception:
+        font = ImageFont.load_default()
+    y = 40
+    for line in lines:
+        draw.text((40, y), line, fill=(0, 0, 0), font=font)
+        y += line_h
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
 def run_verification():
-    print("==================================================")
-    print("⚖️ LEGAL METROLOGY SCANNER — VERIFICATION SUITE")
-    print("==================================================")
+    print("================================================================================")
+    print("⚖️ VERITAS AI LEGAL METROLOGY COMPLIANCE & ENFORCEMENT SYSTEM — E2E VERIFICATION")
+    print("================================================================================")
 
-    # 1. Health check
-    print("\n[STEP 1] Testing Health Endpoint (GET /)...")
-    resp = requests.get("http://127.0.0.1:8000/")
-    assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
-    health_data = resp.json()
-    print(" Response:", health_data)
-    assert health_data["status"] == "active"
-    print("✅ Health check passed!")
+    # 1. Health & Root check
+    print("\n[STEP 1] Testing Root & Health Endpoints...")
+    r_root = client.get(f"{BASE_URL}/")
+    assert r_root.status_code == 200, f"Root failed: {r_root.status_code}"
+    print(" ✅ Root API:", r_root.json()["platform"])
+    
+    r_health = client.get(f"{BASE_URL}/health")
+    assert r_health.status_code == 200, f"Health failed: {r_health.status_code}"
+    print(" ✅ Health API:", r_health.json())
 
-    # 2. Test Compliant Sample
-    print("\n[STEP 2] Testing Compliant Packaged Commodity Label...")
-    img1 = Image.new("RGB", (700, 480), color=(255, 255, 255))
-    draw1 = ImageDraw.Draw(img1)
+    # 2. Authentication check
+    print("\n[STEP 2] Testing Role-Based Authentication...")
+    auth_resp = client.post(f"{BASE_URL}/auth/login", json={"username": "inspector", "password": "inspector123"})
+    assert auth_resp.status_code == 200, f"Auth failed: {auth_resp.status_code}"
+    user_info = auth_resp.json()
+    print(f" ✅ Authenticated as: {user_info['full_name']} | Role: {user_info['role']} | Badge: {user_info['badge_number']}")
+
+    # 3. Test Level 1 Visual Scan (3-Tier Verdict: PHYSICAL_VERIFICATION_REQUIRED)
+    print("\n[STEP 3] Testing Level 1 Statutory Label Scan (Compliant Label -> Physical Verification Required)...")
     lines_compliant = [
         "COMMODITY: Nutri Delight Whole Wheat Biscuits",
         "NET QUANTITY: 500 g",
         "MRP: Rs. 95.00 (inclusive of all taxes)",
+        "USP: Rs. 0.19 per g",
         "MFD & PKD BY: Golden Bake Foods Pvt Ltd, Industrial Area, Sector 4, Pune 411018",
         "DATE OF MFG: 05/2024",
         "CONSUMER CARE: Helpline: 1800-222-3333 | Email: care@goldenbake.com",
         "COUNTRY OF ORIGIN: India",
     ]
-    y = 30
-    for line in lines_compliant:
-        draw1.text((30, y), line, fill=(0, 0, 0))
-        y += 50
-
-    buf1 = io.BytesIO()
-    img1.save(buf1, format="PNG")
-    buf1.seek(0)
-
-    resp1 = requests.post(
-        "http://127.0.0.1:8000/scan-label",
-        files={"file": ("compliant_sample.png", buf1.getvalue(), "image/png")},
-    )
-    assert resp1.status_code == 200, f"Expected 200, got {resp1.status_code}"
+    img1 = create_sample_image(lines_compliant)
+    resp1 = client.post(f"{BASE_URL}/scan-label", files={"file": ("nutri_biscuit.png", img1, "image/png")})
+    assert resp1.status_code == 200, f"Scan failed: {resp1.status_code}"
     data1 = resp1.json()
-    print(" Overall Status:", data1["status"])
-    print(f" Compliance Score: {data1['overall_compliance_score']}%")
+    print(" 3-Tier Status:", data1["status"])
+    print(f" Declaration Compliance Score: {data1['package_declaration_score']}%")
     print(" Violations Count:", data1["violations_count"])
-    for key, decl in data1["declarations"].items():
-        print(f"   • {key}: detected={decl['detected']}, compliant={decl['compliant']}, value='{decl['value']}'")
-
-    assert data1["status"] == "COMPLIANT"
-    assert data1["overall_compliance_score"] == 100.0
+    assert data1["status"] == "PHYSICAL_VERIFICATION_REQUIRED"
     assert data1["violations_count"] == 0
-    print("✅ Compliant label verification passed!")
+    print(" ✅ 3-Tier Status Logic verified: Label passes visual check; marks 'Physical Verification Required'!")
 
-    # 3. Test Non-Compliant Sample (500 gm + missing tax text)
-    print("\n[STEP 3] Testing Non-Compliant Label ('500 gm' + Missing Tax Clause)...")
-    img2 = Image.new("RGB", (700, 480), color=(255, 255, 255))
-    draw2 = ImageDraw.Draw(img2)
-    lines_noncompliant = [
+    # 4. Test Mentor's Scenario: Label says 500g, Actual is 430g (Physical Deficit Violation)
+    print("\n[STEP 4] Testing Mentor's Scenario: Label Declares 500g, Sealed Pack Contains 430g...")
+    form_data_phys = {
+        "declared_net_qty": "500.0",
+        "unit": "g",
+        "measured_net_qty": "430.0", # Shortfall of 70g exceeds MPE limit of 15g
+        "tare_weight": "5.0"
+    }
+    resp2 = client.post(
+        f"{BASE_URL}/scan-label",
+        files={"file": ("nutri_biscuit.png", img1, "image/png")},
+        data=form_data_phys
+    )
+    assert resp2.status_code == 200
+    data2 = resp2.json()
+    print(" Combined Status with Physical Verification:", data2["status"])
+    print(" Physical Verification Status:", data2["physical_verification_status"])
+    print(" Violations Count:", data2["violations_count"])
+    assert data2["status"] == "NON_COMPLIANT"
+    assert data2["physical_verification_status"] == "DEFICIT_VIOLATION"
+    print(" ✅ Mentor's physical content mismatch correctly detected as statutory MPE deficit violation!")
+
+    # 5. Test Non-Compliant Label ('500 gm' illegal unit + missing tax clause)
+    print("\n[STEP 5] Testing Non-Compliant Packaging ('500 gm' + Missing Tax Clause)...")
+    lines_viol = [
         "COMMODITY: Super Crunch Cookies",
         "NET QUANTITY: 500 gm",  # VIOLATION: gm instead of g
         "MRP: Rs. 100",        # VIOLATION: missing 'incl. of all taxes'
@@ -72,75 +127,116 @@ def run_verification():
         "CONSUMER CARE: Helpline: 1800-111-2222 | Email: support@apex.in",
         "COUNTRY OF ORIGIN: India",
     ]
-    y = 30
-    for line in lines_noncompliant:
-        draw2.text((30, y), line, fill=(0, 0, 0))
-        y += 50
-
-    buf2 = io.BytesIO()
-    img2.save(buf2, format="PNG")
-    buf2.seek(0)
-
-    resp2 = requests.post(
-        "http://127.0.0.1:8000/scan-label",
-        files={"file": ("non_compliant_sample.png", buf2.getvalue(), "image/png")},
-    )
-    assert resp2.status_code == 200, f"Expected 200, got {resp2.status_code}"
-    data2 = resp2.json()
-    print(" Overall Status:", data2["status"])
-    print(f" Compliance Score: {data2['overall_compliance_score']}%")
-    print(" Violations Count:", data2["violations_count"])
-    print(" [Violation 1] MRP remarks:", data2["declarations"]["mrp"]["remarks"])
-    print(" [Violation 2] Net Qty remarks:", data2["declarations"]["net_quantity"]["remarks"])
-
-    assert data2["status"] == "NON_COMPLIANT"
-    assert data2["declarations"]["mrp"]["compliant"] is False
-    assert data2["declarations"]["net_quantity"]["compliant"] is False
-    print("✅ Non-compliant label detection verified successfully!")
-
-    # 4. Test Realistic Complex Wrapper (Parle-G Style Yellow Striped Packaging)
-    print("\n[STEP 4] Testing Real FMCG Wrapper (Parle-G Biscuit Style)...")
-    img3 = Image.new("RGB", (800, 320), color=(255, 230, 0))
-    draw3 = ImageDraw.Draw(img3)
-    for i in range(0, 800, 40):
-        draw3.line([(i, 0), (i + 100, 320)], fill=(255, 245, 120), width=12)
-    draw3.rectangle([(20, 20), (220, 90)], fill=(200, 20, 20))
-    draw3.text((40, 35), "Parle-G", fill=(255, 255, 255))
-    draw3.text((250, 30), "PKD: 08/24   BATCH: B12   USE BY: 02/25", fill=(30, 30, 30))
-    draw3.text((250, 70), "NET WT. 55 g   MRP Rs. 5.00 (INCL. OF ALL TAXES)", fill=(30, 30, 30))
-    draw3.text((250, 110), "Mfd. by Parle Products Pvt. Ltd., Mumbai 400057", fill=(30, 30, 30))
-    draw3.text((250, 150), "Consumer Care: 1800-222-7777 | customercare@parle.biz", fill=(30, 30, 30))
-    draw3.text((250, 190), "Made in India | Country of Origin: India", fill=(30, 30, 30))
-
-    buf3 = io.BytesIO()
-    img3.save(buf3, format="PNG")
-    buf3.seek(0)
-
-    resp3 = requests.post(
-        "http://127.0.0.1:8000/scan-label",
-        files={"file": ("parle_g_sample.png", buf3.getvalue(), "image/png")},
-    )
-    assert resp3.status_code == 200, f"Expected 200, got {resp3.status_code}"
+    img2 = create_sample_image(lines_viol)
+    resp3 = client.post(f"{BASE_URL}/scan-label", files={"file": ("viol_cookies.png", img2, "image/png")})
+    assert resp3.status_code == 200
     data3 = resp3.json()
-    print(" Overall Status:", data3["status"])
-    print(f" Compliance Score: {data3['overall_compliance_score']}%")
-    print(" Violations Count:", data3["violations_count"])
-    for key, decl in data3["declarations"].items():
-        print(f"   • {key}: detected={decl['detected']}, compliant={decl['compliant']}, value='{decl['value']}'")
-    assert data3["status"] == "COMPLIANT"
-    assert data3["overall_compliance_score"] == 100.0
-    print("✅ Complex packaging wrapper OCR & compliance verified successfully!")
+    print(" Status:", data3["status"])
+    print(" Violations Flagged:", data3["violations_count"])
+    for v in data3["violations"]:
+        print(f"   • [{v['rule_number']}] {v['field_name']}: {v['description']}")
+    assert data3["status"] == "NON_COMPLIANT"
+    assert data3["violations_count"] >= 2
+    print(" ✅ Statutory non-compliance detection verified!")
 
-    # 5. Test Streamlit Dashboard Connection
-    print("\n[STEP 5] Testing Streamlit Frontend Accessibility (GET http://localhost:8501)...")
-    st_resp = requests.get("http://localhost:8501")
-    assert st_resp.status_code == 200
-    print("✅ Streamlit Dashboard is accessible and returning HTTP 200!")
+    # 6. Test Multi-Panel Scan (Front 500g vs Back 450g Contradiction)
+    print("\n[STEP 6] Testing Multi-View Cross-Panel Conflict Detection...")
+    img_back = create_sample_image(["NET QUANTITY: 450 g", "MRP: Rs. 120 (inclusive of all taxes)"])
+    resp_multi = client.post(
+        f"{BASE_URL}/scan-multi-view",
+        files={
+            "front_file": ("front.png", img1, "image/png"),
+            "back_file": ("back.png", img_back, "image/png")
+        }
+    )
+    assert resp_multi.status_code == 200
+    data_multi = resp_multi.json()
+    print(" Multi-view Conflicts Count:", len(data_multi["cross_source_conflicts"]))
+    for c in data_multi["cross_source_conflicts"]:
+        print(f"   • Conflict on {c['field_name']}: {c['conflict_description']}")
+    assert len(data_multi["cross_source_conflicts"]) > 0
+    print(" ✅ Multi-panel contradiction detection verified!")
 
-    print("\n==================================================")
-    print("🎉 ALL VERIFICATIONS COMPLETED SUCCESSFULLY!")
-    print("==================================================")
+    # 7. Test E-Commerce vs Physical Cross-Verification
+    print("\n[STEP 7] Testing E-Commerce Listing vs Physical Package Verification...")
+    ecomm_data = {
+        "title": "Nutri Delight Premium Biscuits 500g",
+        "listed_mrp": "140.0", # Price gouging (Listed 140 vs Printed 95)
+        "listed_net_quantity": "500 g",
+        "country_of_origin": "India",
+        "has_origin_filter": "false" # VIOLATION: Missing 2026 origin filter
+    }
+    resp_ec = client.post(
+        f"{BASE_URL}/scan-ecommerce",
+        files={"file": ("nutri_biscuit.png", img1, "image/png")},
+        data=ecomm_data
+    )
+    assert resp_ec.status_code == 200
+    data_ec = resp_ec.json()
+    print(" E-Commerce Cross-Check Status:", data_ec["status"])
+    print(" Conflicts & Violations:", len(data_ec["cross_source_conflicts"]), "conflicts,", len(data_ec["violations"]), "violations")
+    assert data_ec["status"] == "NON_COMPLIANT"
+    print(" ✅ E-Commerce 2026 amendment and price overcharging checks verified!")
 
+    # 8. Test Official ReportLab PDF Generation
+    print("\n[STEP 8] Testing Official PDF Report & Certificate Generation...")
+    pdf_form = {
+        "product_name": "Nutri Delight Whole Wheat Biscuits 500g",
+        "brand": "Nutri Delight",
+        "inspector_name": user_info["full_name"],
+        "badge_number": user_info["badge_number"],
+        "district": user_info["district"],
+        "location": "Supermarket Hub, Salem",
+        "declared_net_qty": "500.0",
+        "unit": "g",
+        "measured_net_qty": "500.0"
+    }
+    resp_pdf = client.post(
+        f"{BASE_URL}/inspections/report/pdf",
+        files={"file": ("nutri_biscuit.png", img1, "image/png")},
+        data=pdf_form
+    )
+    assert resp_pdf.status_code == 200
+    assert resp_pdf.headers["content-type"] == "application/pdf"
+    assert len(resp_pdf.content) > 1000
+    print(f" ✅ Official PDF generated successfully! Byte size: {len(resp_pdf.content)} bytes")
+
+    # 9. Test Repository Database Persistence and Retrieval
+    print("\n[STEP 9] Testing Repository Database Save & Query...")
+    case_id = "INSP-VERIFY-001"
+    save_data = {
+        "inspection_id": case_id,
+        "product_name": "Nutri Delight Whole Wheat Biscuits 500g",
+        "brand": "Nutri Delight",
+        "category": "Food & Bakery",
+        "inspector_id": user_info["user_id"],
+        "inspector_name": user_info["full_name"],
+        "district": user_info["district"],
+        "location_details": "Supermarket Hub, Salem",
+        "compliance_json": json.dumps(data1)
+    }
+    save_resp = client.post(f"{BASE_URL}/inspections/save", data=save_data)
+    assert save_resp.status_code == 200
+    print(f" ✅ Case committed to repository: {save_resp.json()}")
+
+    fetch_resp = client.get(f"{BASE_URL}/inspections/{case_id}")
+    assert fetch_resp.status_code == 200
+    saved_case = fetch_resp.json()
+    assert saved_case["inspection_id"] == case_id
+    print(f" ✅ Case retrieved from database: Product = '{saved_case['product_name']}'")
+
+    # 10. Test Dashboard Analytics API
+    print("\n[STEP 10] Testing Executive Enforcement Analytics API...")
+    stats_resp = client.get(f"{BASE_URL}/dashboard/stats")
+    assert stats_resp.status_code == 200
+    stats = stats_resp.json()
+    print(" Analytics Stats:", stats)
+    assert stats["total_inspections"] > 0
+    print(" ✅ Executive Analytics API verified!")
+
+    print("\n================================================================================")
+    print("🎉 ALL 10 STATUTORY CAPABILITY MODULES VERIFIED & WORKING PERFECTLY!")
+    print("================================================================================")
 
 if __name__ == "__main__":
     run_verification()

@@ -1,179 +1,159 @@
-# ⚖️ Legal Metrology Compliance Scanner (Gemini Multimodal Vision)
-
-An enterprise-grade, multimodal AI compliance validation service for packaged commodity labels under the **Legal Metrology (Packaged Commodities) Rules, 2011** (India).
-
-Powered by **Google Gemini 2.5 Flash** (`google-genai` SDK), **FastAPI**, **Pydantic v2**, and **Streamlit**.
-
----
-
-## 🌟 Key Upgrades & Features
-
-- 🧠 **Multimodal Vision Intelligence:** Replaced brittle OCR and regex heuristics with Google's **Gemini 2.5 Flash** for native document understanding, layout analysis, and high-accuracy text extraction.
-- 📐 **Direct Structured Output:** Utilizes `google-genai` structured outputs with Pydantic schemas (`ComplianceResponse`), guaranteeing type-safe, validated JSON responses.
-- 📜 **Statutory Regulatory Engine:** Comprehensive audit against all 6 statutory declarations required under Indian Legal Metrology Rules:
-  1. **Maximum Retail Price (MRP):** Verifies price in ₹/Rs. and strictly enforces mandatory *"inclusive of all taxes"* suffix.
-  2. **Net Quantity / Metric Weight:** Enforces standard SI metric units (`g`, `kg`, `ml`, `l`, `units`) and automatically flags deprecated non-standard units (e.g., `gm`, `gms`, `kilos`) as non-compliant under Rule 13.
-  3. **Date of Packing / Manufacture:** Identifies packaging/manufacturing/import month and year (`MM/YYYY`).
-  4. **Consumer Care & Redressal:** Verifies email address, telephone/toll-free helpline number, or grievance contact address.
-  5. **Manufacturer / Packer / Importer Details:** Identifies full entity name and registered physical address with qualifiers (`Mfg by`, `Packed by`, `Marketed by`).
-  6. **Country of Origin:** Verifies mandatory geographic origin statement (`Made in India`, `Country of Origin`).
-- ⚡ **High Performance & Lightweight:** Eliminated heavy local dependencies (OpenCV, PyTorch, EasyOCR) in favor of high-speed cloud multimodal inference via PIL and the `google-genai` client.
-- 🖥️ **Interactive Web Dashboard:** Streamlit UI supporting both file uploads and live camera capture with visual compliance cards, score gauges, and raw text transcripts.
+# ⚖️ VERITAS AI: Legal Metrology Compliance & Inspection Platform
+### AI-Assisted Regulatory Enforcement System for Pre-Packaged Commodities
+**Statutory Framework:** Legal Metrology Act, 2009 & Legal Metrology (Packaged Commodities) Rules, 2011 (Amended through 2026)  
+**Problem Statement Code:** SIH26034 &bull; Directorate of Legal Metrology, Department of Consumer Affairs, Government of India
 
 ---
 
-## 🏗️ Project Architecture
+## 🌟 Executive Overview & Key Innovations
 
-```plaintext
-legal_metrology_scanner/
-├── main.py                     # FastAPI REST API & endpoints
-├── gemini_compliance_engine.py # Gemini 2.5 Flash multimodal audit engine
-├── schemas.py                  # Pydantic v2 data models & validation
-├── app.py                      # Streamlit interactive UI dashboard
-├── requirements.txt            # Streamlined Python dependencies
-├── .env.example                # Environment variables template
-├── .env                        # Local configuration file (contains GEMINI_API_KEY)
-└── README.md                   # Project documentation & runbook
+**VERITAS AI** is an enterprise-grade statutory compliance verification and enforcement platform built for Legal Metrology Officers, State Controllers, and Regulatory Inspectors. Moving far beyond simple optical character recognition (OCR), VERITAS provides a complete statutory compliance, visual inspection, physical deficit verification, and case management pipeline.
+
+### Core Capabilities:
+1. **3-Tier Decision Engine:**
+   - `COMPLIANT`: All observable statutory requirements satisfied **and** physical content weighed within statutory tolerance.
+   - `NON-COMPLIANT`: Detectable packaging violation found **or** net content deficit exceeds statutory Maximum Permissible Error (MPE).
+   - `PHYSICAL_VERIFICATION_REQUIRED`: All visible packaging declarations pass statutory review, but physical net contents await on-site verification.
+2. **Two-Level Inspection Workflow (Resolving the Mentor's Challenge):**
+   - **Level 1 (Digital/Vision Audit):** High-speed multimodal perception extracting 10+ statutory declarations and measuring character dimensions.
+   - **Level 2 (Physical Verification):** Integrates measured gross/net weights, computes net shortfall, and strictly enforces Maximum Permissible Error (MPE) thresholds under the First Schedule of PCR 2011.
+3. **Statutory Rule Engine (Base 2011 + Amendments up to 2026):**
+   - Rule 6(1)(a)-(g): Mandatory declarations (MRP with tax clause, Net Qty in SI units, Date of Mfg, Consumer Care, Manufacturer, Country of Origin, Generic Name).
+   - Rule 6(1)(h) (2021 Amendment): Unit Sale Price (USP in ₹/g or ₹/kg).
+   - Rule 6(10) (2026 Amendment): E-Commerce mandatory searchable & sortable Country of Origin filter.
+   - Rule 8 & 9: Principal Display Panel (PDP) placement and minimum font height statutory table.
+   - Rule 18: Prohibition against dual pricing across multi-panel viewpoints.
+4. **Multi-Input Ingestion & Cross-Source Consistency:**
+   - Single packaging label scan (Upload / Live Camera).
+   - Multi-view panel scan (Front + Back + Sides) to detect cross-panel contradictions.
+   - E-Commerce listing vs Physical package cross-check (detects online price inflation and origin misrepresentation).
+5. **Automated Visual Evidence Annotation:**
+   - Crops offending bounding regions with high-contrast red warning borders and stamps statutory clause tags.
+6. **Official Government PDF Certificate & Legal Notice Engine:**
+   - Uses `reportlab` to generate publication-grade PDF inspection reports with official Directorate formatting, violation tables, physical audit logs, and digital seal blocks.
+7. **Enforcement Case Repository & Analytics Dashboard:**
+   - Central SQLite / SQLAlchemy database tracking cases across districts (Salem, Pune, Mumbai, etc.).
+   - Executive compliance analytics, violation category breakdowns, and district risk heatmaps.
+
+---
+
+## 🏗️ System Architecture
+
+```
+                 PACKAGED COMMODITY INGESTION
+          (Single Label / Multi-Panel / E-Commerce Listing)
+                                │
+                                ▼
+                 ┌───────────────────────────────┐
+                 │    Multimodal Vision Core     │
+                 │   Google Gemini 2.5 Flash /   │
+                 │   OpenCV + EasyOCR Fallback   │
+                 └──────────────┬────────────────┘
+                                │ Optical Transcription & Bounding Regions
+                                ▼
+                 ┌───────────────────────────────┐
+                 │     Statutory Rule Engine     │
+                 │   (Rules 6, 7, 8, 9, 11, 13,  │
+                 │   2021 USP, 2026 E-Comm Amd)  │
+                 └──────────────┬────────────────┘
+                                │
+         ┌──────────────────────┼──────────────────────┐
+         ▼                      ▼                      ▼
+  Statutory Matrix       Font/Layout Check      Cross-Panel & E-Comm
+  (10+ Declarations)     (Rule 9 Height mm)      Conflict Detection
+         │                      │                      │
+         └──────────────────────┼──────────────────────┘
+                                │
+                                ▼
+                 ┌───────────────────────────────┐
+                 │      3-Tier Decision Engine   │
+                 └──────────────┬────────────────┘
+                                │
+         ┌──────────────────────┼──────────────────────┐
+         ▼                      ▼                      ▼
+     COMPLIANT            NON-COMPLIANT         PHYSICAL VERIFICATION
+ (All visible passed &  (Detectable statutory        REQUIRED
+ physical verified)     infraction / deficit)   (Visual passes; physical
+                                                seal/weight unverified)
+                                │
+                                ▼
+                 ┌───────────────────────────────┐
+                 │    Level 2 Physical Engine    │
+                 │    Weighed Net Content vs     │
+                 │    MPE Limits (First Schedule)│
+                 └──────────────┬────────────────┘
+                                │
+         ┌──────────────────────┼──────────────────────┐
+         ▼                      ▼                      ▼
+  Official PDF Notices   Case Repository DB    Executive Dashboard
+  (ReportLab Govt Std)   (Search & Audit Logs) (District Analytics)
 ```
 
 ---
 
 ## 🚀 Quickstart & Setup
 
-### 1. Prerequisites
-- Python 3.10+ (Python 3.10 – 3.14 supported)
-- A Google Gemini API Key (Get a free API key at [Google AI Studio](https://aistudio.google.com/))
-
-### 2. Clone & Activate Virtual Environment
-
-**Windows (PowerShell):**
-```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-```
-
-**macOS / Linux:**
+### 1. Install Dependencies
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
+python -m pip install -r requirements.txt
 ```
 
-### 3. Install Dependencies
-```bash
-pip install -r requirements.txt
-```
-
-### 4. Configure Environment Variables
-Copy `.env.example` to `.env` and configure your `GEMINI_API_KEY`:
-```bash
-cp .env.example .env
-```
-Edit `.env`:
+### 2. Configure Environment Variables
+Create or update `.env`:
 ```env
-GEMINI_API_KEY=AIzaSy...your_actual_api_key_here
+GEMINI_API_KEY=your_gemini_api_key_here
+API_BASE_URL=http://localhost:8000
+```
+*(Note: If `GEMINI_API_KEY` is not provided, the platform automatically falls back to the embedded local OCR and statutory rule engine for 100% offline functionality).*
+
+### 3. Run the Verification Test Suite
+```bash
+# Run 24 unit tests
+python -m pytest tests/
+
+# Run complete End-to-End System Verification (all 10 capability modules)
+python verify_system.py
 ```
 
----
-
-## 🖥️ Running the Application
-
-### Option 1: Start the Full Stack (Two Terminals)
+### 4. Start the Application Full-Stack
 
 **Terminal 1 — Start the FastAPI Backend:**
 ```bash
 python main.py
 ```
-*API will run at:* `http://localhost:8000`  
-*Swagger Documentation:* `http://localhost:8000/docs`
+*Backend API:* `http://localhost:8000`  
+*Interactive Swagger API Docs:* `http://localhost:8000/docs`
 
-**Terminal 2 — Start the Streamlit Dashboard:**
+**Terminal 2 — Start the Enterprise Streamlit Dashboard:**
 ```bash
 streamlit run app.py
 ```
-*Dashboard will open at:* `http://localhost:8501`
+*Enforcement Console:* `http://localhost:8501`
 
 ---
 
-## 📡 API Reference
+## 📜 Statutory Rules Reference Table
 
-### `POST /scan-label`
-Upload a packaged commodity label image and receive an automated compliance audit.
-
-- **Endpoint:** `http://localhost:8000/scan-label`
-- **Method:** `POST`
-- **Content-Type:** `multipart/form-data`
-- **Accepted Formats:** `image/jpeg`, `image/png`, `image/jpg`, `image/webp`
-
-#### Example `curl` Request:
-```bash
-curl -X POST "http://localhost:8000/scan-label" \
-  -F "file=@sample_packaged_label.jpg"
-```
-
-#### Example Response Body:
-```json
-{
-  "status": "NON_COMPLIANT",
-  "overall_compliance_score": 66.67,
-  "violations_count": 2,
-  "declarations": {
-    "mrp": {
-      "detected": true,
-      "value": "MRP Rs. 45.00 (inclusive of all taxes)",
-      "compliant": true,
-      "remarks": "Valid MRP and mandatory 'inclusive of all taxes' declaration found."
-    },
-    "net_quantity": {
-      "detected": true,
-      "value": "500 gm",
-      "compliant": false,
-      "remarks": "Non-standard unit abbreviation detected. Use standard 'g'/'kg' instead of 'gm'/'gms' as mandated by Rule 13."
-    },
-    "date_of_packing": {
-      "detected": true,
-      "value": "08/2026",
-      "compliant": true,
-      "remarks": "Month and year of manufacture/packing detected."
-    },
-    "consumer_care": {
-      "detected": true,
-      "value": "Email: care@brand.com | Helpline: 1800-209-6929",
-      "compliant": true,
-      "remarks": "Valid consumer grievance contact channels verified."
-    },
-    "manufacturer_details": {
-      "detected": true,
-      "value": "Manufactured by ABC FMCG Ltd, Plot 14, Industrial Area, Mumbai 400001",
-      "compliant": true,
-      "remarks": "Complete manufacturer identity and registered address detected."
-    },
-    "country_of_origin": {
-      "detected": false,
-      "value": null,
-      "compliant": false,
-      "remarks": "Country of origin not declared."
-    }
-  },
-  "raw_text": "ABC FMCG LTD ... MRP Rs. 45.00 (inclusive of all taxes) ... Net Qty: 500 gm ..."
-}
-```
+| Rule | Mandatory Declaration | Standard Required by Law |
+| :--- | :--- | :--- |
+| **Rule 6(1)(a)** | Manufacturer / Packer Identity | Complete name and registered physical address of Manufacturer, Packer, or Importer. |
+| **Rule 6(1)(b)** | Generic Commodity Name | Generic or common name of the pre-packaged commodity. |
+| **Rule 6(1)(c) & Rule 13** | Net Quantity & Standard Units | Quantity in standard SI symbols (`g`, `kg`, `ml`, `l`, `N`). Prohibits deprecated abbreviations (`gm`, `gms`). |
+| **Rule 6(1)(d)** | Date of Packing / Manufacture | Month and Year of packing, manufacture, or import (`MM/YYYY`). |
+| **Rule 6(1)(e) & Rule 8** | Maximum Retail Price (MRP) | Retail price with mandatory suffix *"inclusive of all taxes"*. |
+| **Rule 6(1)(f)** | Consumer Grievance Care | Name, address, telephone helpline, and email for grievance redressal. |
+| **Rule 6(1)(g)** | Country of Origin | Explicit country of origin declaration on packaging for domestic and imported goods. |
+| **Rule 6(1)(h) (2021 Amd)** | Unit Sale Price (USP) | Mandatory unit sale price breakdown in `₹/g`, `₹/ml`, `₹/kg`, or `₹/L`. |
+| **Rule 6(10) (2026 Amd)** | E-Commerce Origin Searchability | Searchable and sortable Country of Origin filter on e-commerce product listings. |
+| **Rule 11 / First Schedule** | Maximum Permissible Error (MPE) | Restricts allowable net quantity shortfall within statutory tolerance limits. |
+| **Rule 18** | Dual Pricing Prohibition | Prohibits declaring different MRPs for identical commodities across panels. |
 
 ---
 
-## 🧪 Statutory Verification Checklist
+## 👥 Default Demo Credentials
 
-| Rule # | Declaration Field | Compliant Example | Non-Compliant Trigger Example |
-|:---|:---|:---|:---|
-| 1 | **MRP** | `MRP ₹50.00 (incl. of all taxes)` | `MRP ₹50.00` *(missing tax clause)* |
-| 2 | **Net Quantity** | `Net Wt: 500 g` or `Net Vol: 1 L` | `500 gm` or `500 gms` *(Rule 13 violation)* |
-| 3 | **Date of Packing** | `Pkd: 09/2026` or `Mfg: Sept 2026` | Missing date or vague batch without date |
-| 4 | **Consumer Care** | `care@example.com / 1800-111-222` | No grievance email or phone |
-| 5 | **Manufacturer** | `Mfg by: XYZ Ltd, Industrial Area` | Missing registered address / entity name |
-| 6 | **Country of Origin** | `Made in India` | Omitted origin declaration |
-
----
-
-## 🛡️ Error Handling
-- **Missing API Key:** Returns HTTP 500 with actionable error instructing the user to configure `GEMINI_API_KEY` in `.env`.
-- **Invalid File Type:** Returns HTTP 400 when non-image formats are submitted.
-- **Backend Disconnect:** Streamlit UI automatically alerts if the FastAPI server is unreachable.
+| Role | Username | Password | Jurisdiction | Badge # |
+| :--- | :--- | :--- | :--- | :--- |
+| **Inspector** | `inspector` | `inspector123` | Salem District | LM-INSP-401 |
+| **Supervisor / Controller** | `supervisor` | `supervisor123` | State Enforcement HQ | LM-SUP-102 |
+| **Directorate Admin** | `admin` | `admin123` | Central Directorate | LM-DIR-001 |
